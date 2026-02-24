@@ -2,7 +2,7 @@
 
 Web GUI, Python CLI, and protocol documentation for the Fichero D11s thermal label printer.
 
-Blog post: [Reverse Engineering Action's Cheap Fichero Labelprinter](https://blog.hamza.homes/reverse-engineering-fichero-label-printer/)
+Blog post: [Reverse Engineering Action's Cheap Fichero Labelprinter](https://blog.dbuglife.com/reverse-engineering-fichero-label-printer/)
 
 The [Fichero](https://www.action.com/nl-nl/p/3212141/fichero-labelprinter/) is a cheap Bluetooth thermal label printer sold at Action. Internally it's an AiYin D11s made by Xiamen Print Future Technology. The official app is closed-source and doesn't expose the protocol, so this project reverse-engineers it from the decompiled APK.
 
