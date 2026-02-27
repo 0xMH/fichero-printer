@@ -4,6 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Fichero D11s Label Printer</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#1a1a2e">
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -945,6 +947,14 @@ function switchTab(name) {
 // Init preview on load
 updateTextPreview();
 log('Ready. Click Connect to pair with your printer.');
+
+if ("serviceWorker" in navigator) {
+    window.addEventListener("load", () => {
+        navigator.serviceWorker.register("/service-worker.js")
+                 .then(() => console.log("Service Worker registered"))
+                 .catch(err => console.log("SW failed:", err));
+    });
+}
 </script>
 
 </body>
