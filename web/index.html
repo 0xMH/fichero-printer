@@ -310,6 +310,9 @@
         <div>Drop an image here, or click to browse</div>
         <input type="file" id="fileInput" accept="image/*">
       </div>
+      <label style="font-size:13px;color:var(--text2);display:flex;align-items:center;gap:6px">
+        <input type="checkbox" id="imgDither" checked> Floyd-Steinberg dithering
+      </label>
       <div class="preview-wrap" id="imgPreviewWrap" style="display:none">
         <canvas id="imgPreview"></canvas>
       </div>
@@ -393,6 +396,7 @@ let notifyBuf = [];
 let notifyResolve = null;
 let connected = false;
 let uploadedCanvas = null; // prepared 1-bit canvas from image upload
+let lastUploadedImg = null; // original Image element for re-processing
 
 // ---- DOM refs ----
 const $ = id => document.getElementById(id);
@@ -654,9 +658,11 @@ function textToCanvas(text, fontSize) {
 }
 
 function prepareImageCanvas(img) {
-  // Resize to 96px wide, proportional height
+  // Resize to 96px wide, proportional height, cap to label length
   const scale = PRINTHEAD_PX / img.width;
-  const newH = Math.round(img.height * scale);
+  const maxH = getLabelHeight();
+  let newH = Math.round(img.height * scale);
+  if (newH > maxH) newH = maxH;
 
   const c = document.createElement('canvas');
   c.width = PRINTHEAD_PX;
@@ -664,7 +670,8 @@ function prepareImageCanvas(img) {
   const ctx = c.getContext('2d');
   ctx.drawImage(img, 0, 0, PRINTHEAD_PX, newH);
 
-  return threshold(c);
+  const useDither = $('imgDither').checked;
+  return useDither ? floydSteinbergDither(c) : threshold(c);
 }
 
 function threshold(canvas) {
@@ -679,6 +686,52 @@ function threshold(canvas) {
     const bw = gray < 160 ? 0 : 255;
     px[i] = px[i + 1] = px[i + 2] = bw;
     px[i + 3] = 255;
+  }
+
+  ctx.putImageData(data, 0, 0);
+  return canvas;
+}
+
+function floydSteinbergDither(canvas) {
+  // Floyd-Steinberg error-diffusion dithering.
+  // Same algorithm as PrinterImageProcessor.ditherFloydSteinberg() in the
+  // decompiled Fichero APK (7/16, 3/16, 5/16, 1/16 error distribution).
+  const ctx = canvas.getContext('2d');
+  const data = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  const px = data.data;
+  const w = canvas.width;
+  const h = canvas.height;
+
+  // Build grayscale float buffer
+  const gray = new Float32Array(w * h);
+  for (let i = 0; i < w * h; i++) {
+    const j = i * 4;
+    gray[i] = 0.299 * px[j] + 0.587 * px[j + 1] + 0.114 * px[j + 2];
+  }
+
+  // Dither
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const idx = y * w + x;
+      const old = gray[idx];
+      const val = old < 128 ? 0 : 255;
+      gray[idx] = val;
+      const err = old - val;
+      if (x + 1 < w)             gray[idx + 1]     += err * 7 / 16;
+      if (y + 1 < h) {
+        if (x - 1 >= 0)          gray[idx + w - 1]  += err * 3 / 16;
+                                  gray[idx + w]      += err * 5 / 16;
+        if (x + 1 < w)           gray[idx + w + 1]  += err * 1 / 16;
+      }
+    }
+  }
+
+  // Write back
+  for (let i = 0; i < w * h; i++) {
+    const v = gray[i] < 128 ? 0 : 255;
+    const j = i * 4;
+    px[j] = px[j + 1] = px[j + 2] = v;
+    px[j + 3] = 255;
   }
 
   ctx.putImageData(data, 0, 0);
@@ -834,15 +887,21 @@ function handleFile(file) {
   reader.onload = () => {
     const img = new Image();
     img.onload = () => {
-      uploadedCanvas = prepareImageCanvas(img);
-      showPreview(uploadedCanvas, 'imgPreview');
-      $('imgPreviewWrap').style.display = '';
-      $('imgPrintBtn').disabled = !connected;
+      lastUploadedImg = img;
+      reprocessImage();
       log(`Image loaded: ${img.width}x${img.height} -> ${uploadedCanvas.width}x${uploadedCanvas.height}`);
     };
     img.src = reader.result;
   };
   reader.readAsDataURL(file);
+}
+
+function reprocessImage() {
+  if (!lastUploadedImg) return;
+  uploadedCanvas = prepareImageCanvas(lastUploadedImg);
+  showPreview(uploadedCanvas, 'imgPreview');
+  $('imgPreviewWrap').style.display = '';
+  $('imgPrintBtn').disabled = !connected;
 }
 
 // ---- Event listeners ----
@@ -855,6 +914,10 @@ $('labelLength').addEventListener('change', updateTextPreview);
 $('fileInput').addEventListener('change', e => {
   if (e.target.files[0]) handleFile(e.target.files[0]);
 });
+
+// Re-process image when dither toggle or label length changes
+$('imgDither').addEventListener('change', () => { if (lastUploadedImg) reprocessImage(); });
+$('labelLength').addEventListener('change', () => { if (lastUploadedImg) reprocessImage(); });
 
 // Dropzone click -> trigger file input
 $('dropzone').addEventListener('click', () => $('fileInput').click());

@@ -2,6 +2,7 @@
 
 import logging
 
+import numpy as np
 from PIL import Image, ImageDraw, ImageFont, ImageOps
 
 from fichero.printer import PRINTHEAD_PX
@@ -9,16 +10,60 @@ from fichero.printer import PRINTHEAD_PX
 log = logging.getLogger(__name__)
 
 
-def prepare_image(img: Image.Image, max_rows: int = 240) -> Image.Image:
-    """Convert any image to 96px wide, 1-bit, black on white."""
+def floyd_steinberg_dither(img: Image.Image) -> Image.Image:
+    """Floyd-Steinberg error-diffusion dithering to 1-bit.
+
+    Same algorithm as PrinterImageProcessor.ditherFloydSteinberg() in the
+    decompiled Fichero APK: distributes quantisation error to neighbouring
+    pixels with weights 7/16, 3/16, 5/16, 1/16.
+    """
+    arr = np.array(img, dtype=np.float32)
+    h, w = arr.shape
+
+    for y in range(h):
+        for x in range(w):
+            old = arr[y, x]
+            new = 0.0 if old < 128 else 255.0
+            arr[y, x] = new
+            err = old - new
+            if x + 1 < w:
+                arr[y, x + 1] += err * 7 / 16
+            if y + 1 < h:
+                if x - 1 >= 0:
+                    arr[y + 1, x - 1] += err * 3 / 16
+                arr[y + 1, x] += err * 5 / 16
+                if x + 1 < w:
+                    arr[y + 1, x + 1] += err * 1 / 16
+
+    arr = np.clip(arr, 0, 255).astype(np.uint8)
+    return Image.fromarray(arr, mode="L")
+
+
+def prepare_image(
+    img: Image.Image, max_rows: int = 240, dither: bool = True
+) -> Image.Image:
+    """Convert any image to 96px wide, 1-bit, black on white.
+
+    When *dither* is True (default), uses Floyd-Steinberg error diffusion
+    for better quality on photos and gradients.  Set False for crisp text.
+    """
     img = img.convert("L")
     w, h = img.size
     new_h = int(h * (PRINTHEAD_PX / w))
+    img = img.resize((PRINTHEAD_PX, new_h), Image.LANCZOS)
+
     if new_h > max_rows:
         log.warning("Image height %dpx exceeds max %dpx, cropping bottom", new_h, max_rows)
-        new_h = max_rows
-    img = img.resize((PRINTHEAD_PX, new_h), Image.LANCZOS)
+        img = img.crop((0, 0, PRINTHEAD_PX, max_rows))
+
     img = ImageOps.autocontrast(img, cutoff=1)
+
+    if dither:
+        img = floyd_steinberg_dither(img)
+
+    # Pack to 1-bit.  PIL mode "1" tobytes() uses 0-bit=black, 1-bit=white,
+    # but the printer wants 1-bit=black.  Mapping dark->1 via point() inverts
+    # the PIL convention so the final packed bits match what the printer needs.
     img = img.point(lambda x: 1 if x < 128 else 0, "1")
     return img
 
@@ -44,8 +89,8 @@ def text_to_image(text: str, font_size: int = 30, label_height: int = 240) -> Im
 
     bbox = draw.textbbox((0, 0), text, font=font)
     tw, th = bbox[2] - bbox[0], bbox[3] - bbox[1]
-    x = (canvas_w - tw) // 2
-    y = (canvas_h - th) // 2
+    x = (canvas_w - tw) // 2 - bbox[0]
+    y = (canvas_h - th) // 2 - bbox[1]
     draw.text((x, y), text, fill=0, font=font)
 
     img = img.rotate(90, expand=True)
