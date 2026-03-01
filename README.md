@@ -49,9 +49,9 @@ One more reason to ditch the app and talk to the printer directly.
 
 ## Web GUI
 
-Try it at https://0xmh.github.io/fichero-printer/web/index.html - or open `web/index.html` locally. No server needed, no dependencies, no build step.
+Try it at https://0xmh.github.io/fichero-printer/ - a full label designer with text, images, barcodes, QR codes, and drag-and-drop canvas editing. Built with Svelte 5 and Fabric.js, ported from the NiimBlue project (MIT).
 
-Click Connect, pair with the printer through the browser's Bluetooth dialog, and you're ready to print. The UI has two tabs: one for text labels (with a live 96px preview) and one for image labels (drag-and-drop). Device info, battery, and settings are all accessible from the same page.
+Click the Bluetooth icon, pair with the printer, and start designing. Labels save to browser localStorage. Export as JSON or PNG.
 
 Requires Web Bluetooth, so Chrome/Edge/Opera only. Firefox and Safari don't support it.
 

@@ -1,0 +1,111 @@
+export const copyImageData = (iData: ImageData): ImageData => {
+  return new ImageData(new Uint8ClampedArray(iData.data), iData.width, iData.height);
+};
+
+// Original code is taken from https://github.com/NielsLeenheer/CanvasDither
+// (but it is has typescript definitions and Atkinson threshold)
+
+/**
+ * Change the image to blank and white using a simple threshold
+ *
+ *
+ * @param  {object}   image         The imageData of a Canvas 2d context
+ * @param  {number}   threshold     Threshold value (0-255)
+ * @return {object}                 The resulting imageData
+ *
+ */
+export const threshold = (image: ImageData, threshold: number): ImageData => {
+  for (let i = 0; i < image.data.length; i += 4) {
+    const luminance = image.data[i] * 0.299 + image.data[i + 1] * 0.587 + image.data[i + 2] * 0.114;
+    const value = luminance < threshold ? 0 : 255;
+    image.data.fill(value, i, i + 3);
+  }
+
+  return image;
+};
+
+/**
+ * Change the image to blank and white using the Atkinson algorithm
+ *
+ * @param  {object}   image         The imageData of a Canvas 2d context
+ * @param  {number}   threshold     Threshold value (0-255)
+ * @return {object}                 The resulting imageData
+ *
+ */
+export const atkinson = (image: ImageData, threshold: number): ImageData => {
+  const src = image.data;
+  const dst = new Uint8ClampedArray(image.width * image.height);
+
+  for (let l = 0, i = 0; i < src.length; l++, i += 4) {
+    dst[l] = src[i] * 0.299 + src[i + 1] * 0.587 + src[i + 2] * 0.114;
+  }
+
+  for (let l = 0, i = 0; i < src.length; l++, i += 4) {
+    const value = dst[l] < threshold ? 0 : 255;
+    const error = Math.floor((dst[l] - value) / 8);
+    src.fill(value, i, i + 3);
+
+    dst[l + 1] += error;
+    dst[l + 2] += error;
+    dst[l + image.width - 1] += error;
+    dst[l + image.width] += error;
+    dst[l + image.width + 1] += error;
+    dst[l + 2 * image.width] += error;
+  }
+
+  return image;
+};
+
+/**
+ * Change the image to blank and white using the Bayer ordered dithering
+ *
+ * @param  {object}   image         The imageData of a Canvas 2d context
+ * @param  {number}   threshold     Threshold value (0-255)
+ * @return {object}                 The resulting imageData
+ *
+ */
+export const bayer = (image: ImageData, threshold: number): ImageData => {
+  const src = image.data;
+  const width = image.width;
+
+  // Pre-calculated 8x8 Bayer matrix (normalized to 0-255)
+  const bayerMatrix = [
+    [0, 191, 48, 239, 12, 203, 60, 251],
+    [128, 64, 176, 112, 140, 76, 188, 124],
+    [32, 223, 16, 207, 44, 235, 28, 219],
+    [160, 96, 144, 80, 172, 108, 156, 92],
+    [8, 199, 56, 247, 4, 195, 52, 243],
+    [136, 72, 184, 120, 132, 68, 180, 116],
+    [40, 231, 24, 215, 36, 227, 20, 211],
+    [168, 104, 152, 88, 164, 100, 148, 84]
+  ];
+
+  for (let i = 0; i < src.length; i += 4) {
+    const x = (i / 4) % width;
+    const y = Math.floor((i / 4) / width);
+
+    const gray = src[i] * 0.299 + src[i + 1] * 0.587 + src[i + 2] * 0.114;
+    const bayerValue = bayerMatrix[y % 8][x % 8];
+    const value = gray < threshold - bayerValue / 2 ? 0 : 255;
+
+    src[i] = src[i + 1] = src[i + 2] = value;
+  }
+
+  return image;
+};
+
+/**
+ * Invert image
+ *
+ * @param  {object}   image         The imageData of a Canvas 2d context
+ * @return {object}                 The resulting imageData
+ *
+ */
+export const invert = (image: ImageData): ImageData => {
+  for (let i = 0; i < image.data.length; i += 4) {
+    const black = (image.data[i] + image.data[i + 1] + image.data[i + 2]) === 0;
+    image.data.fill(black ? 255 : 0, i, i + 3);
+  }
+
+  return image;
+};

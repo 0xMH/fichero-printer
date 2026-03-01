@@ -1,0 +1,16 @@
+{
+  "name": "Fichero",
+  "short_name": "fichero",
+  "description": "Fichero D11s label printer web app. Design and print labels directly from your browser!",
+  "icons": [
+    {
+      "src": "logo.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ],
+  "start_url": "/",
+  "display": "standalone",
+  "theme_color": "#212529",
+  "background_color": "#212529"
+}
