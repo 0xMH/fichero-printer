@@ -84,13 +84,14 @@
           </button>
         {/each}
       {/if}
-    </div>
-  {/if}
 
-  {#if fontQuerySupported}
-    <button class="btn {$fontCache.length <= 1 ? 'btn-primary pulse' : 'btn-outline-secondary'}" onclick={getSystemFonts} title={$tr("params.text.fetch_fonts")}>
-      <MdIcon icon="refresh" />
-    </button>
+      {#if fontQuerySupported && $fontCache.length <= 1}
+        <div class="dropdown-divider"></div>
+        <button class="dropdown-item text-primary" type="button" onclick={getSystemFonts}>
+          <MdIcon icon="refresh" /> Load system fonts
+        </button>
+      {/if}
+    </div>
   {/if}
 
   <FontsMenu />
@@ -110,12 +111,4 @@
     overflow-y: auto;
   }
 
-  .pulse {
-    animation: pulse 1.5s ease-in-out 3;
-  }
-
-  @keyframes pulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.5; }
-  }
 </style>
