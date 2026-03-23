@@ -48,7 +48,7 @@
   </div>
   <div>
     {#if appCommit}
-      <a class="text-secondary" href="https://github.com/mohamedha/fichero-printer/commit/{appCommit}">
+      <a class="text-secondary" href="https://github.com/0xMH/fichero-printer/commit/{appCommit}">
         {appCommit.slice(0, 6)}
       </a>
     {/if}
@@ -56,7 +56,7 @@
     {buildDate}
   </div>
   <div>
-    <a class="text-secondary" href="https://github.com/mohamedha/fichero-printer">{$tr("main.code")}</a>
+    <a class="text-secondary" href="https://github.com/0xMH/fichero-printer">{$tr("main.code")}</a>
     <button class="text-secondary btn btn-link p-0" onclick={() => debugStuffShow = true}>
       <MdIcon icon="bug_report" />
     </button>

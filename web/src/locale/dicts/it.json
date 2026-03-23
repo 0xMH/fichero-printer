@@ -1,6 +1,7 @@
 {
     "lang.name": "Italiano",
     "browser_warning.lines.first": "Oh no, il tuo browser non supporta le comunicazioni Bluetooth e seriali",
+    "browser_warning.lines.third": "Oppure verifica chrome://flags/#enable-experimental-web-platform-features",
     "browser_warning.lines.second": "Comunque, puoi disegnare etichette.",
     "connector.bluetooth": "Bluetooth",
     "connector.disconnect.heartbeat": "Disconnesso (la stampante non risponde)",

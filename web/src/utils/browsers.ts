@@ -1,3 +1,10 @@
+/** Check if browser is Chrome-based (Chrome, Chromium, Edge, Opera, Brave, etc.) */
+export const detectChromeBased = () => {
+  if (typeof navigator === "undefined") return false;
+  const ua = navigator.userAgent.toLowerCase();
+  return /chrome|chromium|edg|opr|brave/i.test(ua) && !/firefox/i.test(ua);
+};
+
 /** Check if browser makes some modifications to canvas when reading */
 export const detectAntiFingerprinting = () => {
   const size = 32;

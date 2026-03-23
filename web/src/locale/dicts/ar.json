@@ -2,6 +2,7 @@
     "lang.name": "العربية",
     "browser_warning.fingerprinting": "تنبيه! يبدو أن متصفحك يُشوّه الصورة للحماية من التعقب. يُرجى تعطيل هذه الحماية، لأنها قد تُسبب تشوهات في الملصقات.",
     "browser_warning.lines.first": "لا لا! متصفحك لا يدعم البلوتوث والاتصالات التسلسلية.",
+    "browser_warning.lines.third": "أو تحقق من chrome://flags/#enable-experimental-web-platform-features",
     "browser_warning.lines.second": "على أي حال، لا زال بإمكانك رسم ملصقات.",
     "connector.bluetooth": "بلوتوث",
     "connector.disconnect.heartbeat": "انقطع الاتصال (الطابعة لا تستجيب)",

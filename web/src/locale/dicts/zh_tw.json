@@ -2,6 +2,7 @@
     "lang.name": "繁體中文",
     "browser_warning.fingerprinting": "哇！看起來您的瀏覽器正在扭曲畫布以防止指紋識別。請停用此保護，因為它可能會在標籤上造成瑕疵。",
     "browser_warning.lines.first": "哎呀，您的瀏覽器似乎不支援藍牙和序列埠通訊",
+    "browser_warning.lines.third": "或查看 chrome://flags/#enable-experimental-web-platform-features",
     "browser_warning.lines.second": "但是您仍然可以使用標籤編輯功能",
     "connector.bluetooth": "藍牙",
     "connector.disconnect.heartbeat": "已中斷連線（印表機無回應）",

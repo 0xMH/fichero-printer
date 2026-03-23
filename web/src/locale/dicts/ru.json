@@ -2,6 +2,7 @@
     "lang.name": "Русский",
     "browser_warning.fingerprinting": "Воу! Похоже, что ваш браузер искажает холст для борьбы с цифровыми отпечатками. Отключите эту защиту, так как она может вызвать артефакты на этикетках.",
     "browser_warning.lines.first": "О нет, ваш браузер не поддерживает Bluetooth и последовательный порт",
+    "browser_warning.lines.third": "Или откройте chrome://flags/#enable-experimental-web-platform-features",
     "browser_warning.lines.second": "В любом случае, вы можете рисовать этикетки.",
     "connector.bluetooth": "Bluetooth",
     "connector.disconnect.heartbeat": "Отключено (принтер не отвечает)",

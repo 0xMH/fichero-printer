@@ -1,6 +1,7 @@
 {
     "lang.name": "Français",
     "browser_warning.lines.first": "Oh non, votre navigateur ne prend pas en charge les communications Bluetooth et série",
+    "browser_warning.lines.third": "Ou consultez chrome://flags/#enable-experimental-web-platform-features",
     "browser_warning.lines.second": "Quoi qu'il en soit, vous pouvez toujours dessiner des étiquettes.",
     "connector.bluetooth": "Bluetooth",
     "connector.disconnect.heartbeat": "Déconnecté (l'imprimante ne répond pas)",

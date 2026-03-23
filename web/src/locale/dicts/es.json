@@ -2,6 +2,7 @@
     "lang.name": "Español",
     "browser_warning.fingerprinting": "¡Vaya! Parece que tu navegador está distorsionando el lienzo para protegerte del fingerprinting. Por favor, desactiva esta protección, ya que puede provocar artefactos en las etiquetas.",
     "browser_warning.lines.first": "Oh no, tu navegador no admite comunicaciones Bluetooth ni serie",
+    "browser_warning.lines.third": "O revisa chrome://flags/#enable-experimental-web-platform-features",
     "browser_warning.lines.second": "En cualquier caso, aún puedes dibujar etiquetas.",
     "connector.bluetooth": "Bluetooth",
     "connector.disconnect.heartbeat": "Desconectado (la impresora no responde)",

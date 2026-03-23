@@ -1,6 +1,7 @@
 {
     "lang.name": "Deutsch",
     "browser_warning.lines.first": "Oh nein, Dein Browser unterstützt kein Bluetooth und keine serielle Schnittstelle",
+    "browser_warning.lines.third": "Oder prüfe chrome://flags/#enable-experimental-web-platform-features",
     "browser_warning.lines.second": "Du kannst trotzdem Etiketten erstellen.",
     "connector.bluetooth": "Bluetooth",
     "connector.disconnect.heartbeat": "Getrennt (Drucker reagiert nicht)",

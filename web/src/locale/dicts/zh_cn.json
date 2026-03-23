@@ -1,6 +1,7 @@
 {
     "lang.name": "简体中文",
     "browser_warning.lines.first": "哦豁，你的浏览器貌似不支持蓝牙和串口通讯",
+    "browser_warning.lines.third": "或查看 chrome://flags/#enable-experimental-web-platform-features",
     "browser_warning.lines.second": "但是你依然可以使用标签编辑功能",
     "connector.bluetooth": "蓝牙",
     "connector.disconnect.heartbeat": "已断开（打印机无响应）",

@@ -2,6 +2,7 @@
     "lang.name": "Türkçe",
     "browser_warning.fingerprinting": "Dikkat! Tarayıcınız parmak izi koruması için tuvali bozuyor gibi görünüyor. Lütfen bu korumayı devre dışı bırakın, etiketlerde bozulmalara neden olabilir.",
     "browser_warning.lines.first": "Maalesef tarayıcınız Bluetooth ve seri iletişimi desteklemiyor",
+    "browser_warning.lines.third": "Veya chrome://flags/#enable-experimental-web-platform-features adresine bakın",
     "browser_warning.lines.second": "Yine de etiket tasarlayabilirsiniz.",
     "connector.bluetooth": "Bluetooth",
     "connector.disconnect.heartbeat": "Bağlantı kesildi (yazıcı yanıt vermiyor)",

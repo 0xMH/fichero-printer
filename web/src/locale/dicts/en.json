@@ -2,6 +2,7 @@
     "lang.name": "English",
     "browser_warning.fingerprinting": "Whoa! It looks like your browser is distorting the canvas to protect against fingerprinting. Please disable this protection, as it can cause artifacts on labels.",
     "browser_warning.lines.first": "Your browser does not support Web Bluetooth. Use Chrome, Edge, or Opera to connect to your printer.",
+    "browser_warning.lines.third": "Or check chrome://flags/#enable-experimental-web-platform-features",
     "browser_warning.lines.second": "You can still design labels without connecting.",
     "connector.bluetooth": "Bluetooth",
     "connector.disconnect.heartbeat": "Disconnected (printer does not respond)",

@@ -2,10 +2,11 @@
   import { Utils } from "$/lib/fichero";
   import { tr } from "$/utils/i18n";
   import MdIcon from "$/components/basic/MdIcon.svelte";
-  import { detectAntiFingerprinting } from "$/utils/browsers";
+  import { detectAntiFingerprinting, detectChromeBased } from "$/utils/browsers";
   let caps = Utils.getAvailableTransports();
 
   let antiFingerprinting = detectAntiFingerprinting();
+  let isChromeBased = detectChromeBased();
   let isMobile = typeof navigator !== "undefined" && /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
 </script>
 
@@ -18,6 +19,11 @@
       <div>
         {$tr("browser_warning.lines.first")}
       </div>
+      {#if isChromeBased}
+        <div style="margin-top: 10px; font-size: 0.9em;">
+          {$tr("browser_warning.lines.third")}
+        </div>
+      {/if}
       <div>
         {$tr("browser_warning.lines.second")}
       </div>

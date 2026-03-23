@@ -1,6 +1,7 @@
 {
     "lang.name": "Čeština",
     "browser_warning.lines.first": "Aj, váš prohlížeč nepodporuje bluetooth a sériovou komunikaci",
+    "browser_warning.lines.third": "Nebo zkontrolujte chrome://flags/#enable-experimental-web-platform-features",
     "browser_warning.lines.second": "I tak můžete upravovat štítky.",
     "connector.bluetooth": "Bluetooth",
     "connector.disconnect.heartbeat": "Odpojeno (tiskárna neodpovídá)",
