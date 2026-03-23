@@ -2,6 +2,7 @@
     "lang.name": "मराठी",
     "browser_warning.fingerprinting": "अरे! असे दिसत आहे की तुमचा ब्राउझर फिंगरप्रिंटिंगपासून संरक्षण करण्यासाठी कॅनव्हासमध्ये बदल करत आहे. कृपया हे संरक्षण बंद करा, कारण यामुळे लेबलवर त्रुटी निर्माण होऊ शकतात.",
     "browser_warning.lines.first": "अरे नाही, तुमचा ब्राउझर ब्लूटूथ आणि सिरीयल संप्रेषणाला समर्थन देत नाही",
+    "browser_warning.lines.third": "किंवा chrome://flags/#enable-experimental-web-platform-features तपासा",
     "browser_warning.lines.second": "तरीही, तुम्ही लेबल तयार करू शकता.",
     "connector.bluetooth": "ब्लूटूथ",
     "connector.disconnect.heartbeat": "कनेक्शन तुटले आहे (प्रिंटर प्रतिसाद देत नाही)",
