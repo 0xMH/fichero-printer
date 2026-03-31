@@ -117,14 +117,24 @@ async def cmd_text(args: argparse.Namespace) -> None:
 
 
 async def cmd_image(args: argparse.Namespace) -> None:
-    img = Image.open(args.path)
     label_h = _resolve_label_height(args)
     async with connect(args.address, classic=args.classic, channel=args.channel) as pc:
-        print(f"Printing {args.path}...")
-        ok = await do_print(pc, img, args.density, paper=args.paper,
-                            copies=args.copies, dither=not args.no_dither,
-                            max_rows=label_h)
-        print("Done." if ok else "FAILED.")
+        all_ok = True
+        for path in args.path:
+            img = Image.open(path)
+            print(f"Printing {path}...")
+            ok = await do_print(pc, img, args.density, paper=args.paper,
+                                copies=args.copies, dither=not args.no_dither,
+                                max_rows=label_h)
+            if not ok:
+                print(f"FAILED: {path}")
+                all_ok = False
+            else:
+                print("Done.")
+        if all_ok:
+            print("All images printed successfully.")
+        else:
+            print("Some images failed to print.")
 
 
 async def cmd_set(args: argparse.Namespace) -> None:
@@ -214,8 +224,8 @@ def main() -> None:
     _add_paper_arg(p_text)
     p_text.set_defaults(func=cmd_text)
 
-    p_image = sub.add_parser("image", help="Print image file")
-    p_image.add_argument("path", help="Path to image file")
+    p_image = sub.add_parser("image", help="Print image file(s)")
+    p_image.add_argument("path", nargs="+", help="Path to image file(s)")
     p_image.add_argument("--density", type=int, default=2, choices=[0, 1, 2],
                          help="Print density: 0=light, 1=medium, 2=thick")
     p_image.add_argument("--copies", type=int, default=1, help="Number of copies")
