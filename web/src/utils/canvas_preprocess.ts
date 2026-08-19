@@ -32,7 +32,14 @@ export const canvasPreprocess = (canvas: fabric.Canvas, variables?: { [key: stri
       const text = preprocessString(obj.text ?? "", variables);
 
       if (obj instanceof TextboxExt && obj.fontAutoSize) {
-        obj.setAndShrinkText(text, obj.width);
+        const top = obj.top ?? 0;
+        const centerY =
+          obj.originY === "center" ? top : obj.originY === "bottom" ? top - obj.height / 2 : top + obj.height / 2;
+        const maxHeight =
+          obj.originY === "center"
+            ? Math.max(2, Math.min(centerY, canvas.height - centerY) * 2)
+            : Math.max(2, canvas.height - top);
+        obj.setAndShrinkText(text, obj.width, undefined, maxHeight);
       } else {
         obj.set({ text });
       }

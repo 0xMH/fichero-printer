@@ -85,4 +85,5 @@ export const APP_CONFIG_DEFAULTS: AppConfig = {
   iconListMode: "both"
 };
 
-export const CSV_DEFAULT = "var1,var2\n123,456\n777,888";
+export const CSV_DEFAULT = "";
+export const CSV_PLACEHOLDER = "col1,col2,col3,col4,col5\nvalue 1,value 2,value 3,value 4,value 5";

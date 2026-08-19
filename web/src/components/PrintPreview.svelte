@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import { derived } from "svelte/store";
+  import * as fabric from "fabric";
   import { appConfig, connectionState, printerClient, printerMeta, refreshRfidInfo } from "$/stores";
   import { copyImageData, threshold, atkinson, invert, bayer } from "$/utils/post_process";
   import {
@@ -17,24 +18,39 @@
   import ParamLockButton from "$/components/basic/ParamLockButton.svelte";
   import { tr, type TranslationKey } from "$/utils/i18n";
   import { canvasPreprocess } from "$/utils/canvas_preprocess";
-  import { type DSVRowArray, csvParse } from "d3-dsv";
+  import { type DSVRowArray } from "d3-dsv";
   import { LocalStoragePersistence } from "$/utils/persistence";
   import MdIcon from "$/components/basic/MdIcon.svelte";
   import { Toasts } from "$/utils/toasts";
   import { CustomCanvas } from "$/fabric-object/custom_canvas";
   import { FileUtils } from "$/utils/file_utils";
   import AppModal from "$/components/basic/AppModal.svelte";
+  import { parseCsvData } from "$/utils/csv";
+  import { TextboxExt } from "$/fabric-object/textbox-ext";
 
   interface Props {
     labelProps: LabelProps;
     canvasCallback: () => FabricJson;
     printNow?: boolean;
     csvData: string;
+    csvDelimiter?: string;
+    csvHasHeader?: boolean;
+    csvOneItemPerCell?: boolean;
     csvEnabled: boolean;
     show: boolean;
   }
 
-  let { labelProps, canvasCallback, printNow = false, csvData, csvEnabled, show = $bindable() }: Props = $props();
+  let {
+    labelProps,
+    canvasCallback,
+    printNow = false,
+    csvData,
+    csvDelimiter,
+    csvHasHeader,
+    csvOneItemPerCell,
+    csvEnabled,
+    show = $bindable(),
+  }: Props = $props();
 
   let previewCanvas: HTMLCanvasElement;
   let printState = $state<"idle" | "sending" | "printing">("idle");
@@ -54,8 +70,29 @@
   let error = $state<string>("");
   let detectedPrintTaskName: PrintTaskName | undefined = $printerClient?.getPrintTaskType();
   let csvParsed: DSVRowArray<string>;
+
+  const defaultTextValues = () => new Set(["", "Text", $tr("editor.default_text")]);
+
+  const applyCsvSingleValueFallback = (canvas: fabric.Canvas) => {
+    if (!csvEnabled || !csvOneItemPerCell || csvParsed.length === 0) {
+      return;
+    }
+
+    const textObjects = canvas.getObjects().filter((obj): obj is fabric.IText => obj instanceof fabric.IText);
+    if (textObjects.length !== 1 || !defaultTextValues().has((textObjects[0].text ?? "").trim())) {
+      return;
+    }
+
+    textObjects[0].set({ text: "{col1}" });
+    if (textObjects[0] instanceof TextboxExt) {
+      textObjects[0].set({ fontAutoSize: true });
+    }
+  };
   let page = $state<number>(0);
   let pagesTotal = $state<number>(1);
+  let batchPreviewMode = $state<"grid" | "row" | "column">("grid");
+  let batchPreviewUrls = $state<string[]>([]);
+  let batchPreviewLoading = $state<boolean>(false);
   let offset = $state<PreviewPropsOffset>({ x: 0, y: 0, offsetType: "inner" });
   let offsetWarning = $state<string>("");
   let currentPrintTask: AbstractPrintTask | undefined;
@@ -170,8 +207,8 @@
     }
   };
 
-  const updatePreview = () => {
-    let iData: ImageData = copyImageData(originalImage);
+  const applyPostProcess = (source: ImageData): ImageData => {
+    let iData: ImageData = copyImageData(source);
 
     if (postProcessType === "threshold") {
       iData = threshold(iData, thresholdValue);
@@ -185,30 +222,47 @@
       iData = invert(iData);
     }
 
-    offsetWarning = "";
+    return iData;
+  };
 
-    if (offset.offsetType === "inner") {
-      previewCanvas.width = originalImage.width;
-      previewCanvas.height = originalImage.height;
-      previewContext.fillStyle = "white";
-      previewContext.fillRect(0, 0, previewCanvas.width, previewCanvas.height);
-      previewContext.putImageData(iData, offset.x, offset.y);
-    } else {
-      previewCanvas.width = originalImage.width + Math.abs(offset.x);
-      previewCanvas.height = originalImage.height + Math.abs(offset.y);
-      previewContext.fillStyle = "white";
-      previewContext.fillRect(0, 0, previewCanvas.width, previewCanvas.height);
-      previewContext.putImageData(iData, Math.max(offset.x, 0), Math.max(offset.y, 0));
+  const drawPreviewImage = (
+    source: ImageData,
+    targetCanvas: HTMLCanvasElement,
+    targetContext: CanvasRenderingContext2D,
+    updateWarnings: boolean,
+  ) => {
+    const iData = applyPostProcess(source);
+
+    if (updateWarnings) {
+      offsetWarning = "";
     }
 
-    if ($printerMeta !== undefined) {
-      const headSize = labelProps.printDirection == "left" ? previewCanvas.height : previewCanvas.width;
+    if (offset.offsetType === "inner") {
+      targetCanvas.width = source.width;
+      targetCanvas.height = source.height;
+      targetContext.fillStyle = "white";
+      targetContext.fillRect(0, 0, targetCanvas.width, targetCanvas.height);
+      targetContext.putImageData(iData, offset.x, offset.y);
+    } else {
+      targetCanvas.width = source.width + Math.abs(offset.x);
+      targetCanvas.height = source.height + Math.abs(offset.y);
+      targetContext.fillStyle = "white";
+      targetContext.fillRect(0, 0, targetCanvas.width, targetCanvas.height);
+      targetContext.putImageData(iData, Math.max(offset.x, 0), Math.max(offset.y, 0));
+    }
+
+    if (updateWarnings && $printerMeta !== undefined) {
+      const headSize = labelProps.printDirection == "left" ? targetCanvas.height : targetCanvas.width;
       if (headSize > $printerMeta.printheadPixels) {
         offsetWarning += $tr("params.label.warning.width") + " ";
         offsetWarning += `(${headSize} > ${$printerMeta.printheadPixels})`;
         offsetWarning += "\n";
       }
     }
+  };
+
+  const updatePreview = () => {
+    drawPreviewImage(originalImage, previewCanvas, previewContext, true);
   };
 
   const toggleSavedProp = (key: string, value: any) => {
@@ -235,6 +289,7 @@
 
     if (refreshPreview) {
       updatePreview();
+      refreshBatchPreviews();
     }
   };
 
@@ -277,7 +332,7 @@
     generatePreviewData(page);
   };
 
-  const generatePreviewData = async (page: number): Promise<void> => {
+  const generateOriginalImageData = async (page: number): Promise<ImageData> => {
     const fabricTempCanvas = new CustomCanvas(undefined, {
       width: labelProps.size.width,
       height: labelProps.size.height,
@@ -289,6 +344,7 @@
     fabricTempCanvas.setLabelProps(labelProps);
 
     await fabricTempCanvas.loadFromJSON(canvasCallback());
+    applyCsvSingleValueFallback(fabricTempCanvas);
 
     let variables = {};
 
@@ -310,14 +366,52 @@
 
     const preRenderedCanvas = fabricTempCanvas.toCanvasElement();
     const ctx = preRenderedCanvas.getContext("2d")!;
-    previewCanvas.width = preRenderedCanvas.width;
-    previewCanvas.height = preRenderedCanvas.height;
-    previewContext = previewCanvas.getContext("2d")!;
-    originalImage = ctx.getImageData(0, 0, preRenderedCanvas.width, preRenderedCanvas.height);
-
-    updatePreview();
+    const imageData = ctx.getImageData(0, 0, preRenderedCanvas.width, preRenderedCanvas.height);
 
     fabricTempCanvas.dispose();
+
+    return imageData;
+  };
+
+  const generatePreviewData = async (page: number): Promise<void> => {
+    originalImage = await generateOriginalImageData(page);
+    previewCanvas.width = originalImage.width;
+    previewCanvas.height = originalImage.height;
+    previewContext = previewCanvas.getContext("2d")!;
+
+    updatePreview();
+  };
+
+  const previewUrlForPage = async (page: number): Promise<string> => {
+    const source = await generateOriginalImageData(page);
+    const canvas = document.createElement("canvas");
+    const ctx = canvas.getContext("2d")!;
+
+    drawPreviewImage(source, canvas, ctx, false);
+
+    return canvas.toDataURL("image/png");
+  };
+
+  const refreshBatchPreviews = async () => {
+    if (pagesTotal <= 1) {
+      batchPreviewUrls = [];
+      return;
+    }
+
+    batchPreviewLoading = true;
+    const urls: string[] = [];
+
+    for (let curPage = 0; curPage < pagesTotal; curPage++) {
+      urls.push(await previewUrlForPage(curPage));
+    }
+
+    batchPreviewUrls = urls;
+    batchPreviewLoading = false;
+  };
+
+  const showBatchPage = async (selectedPage: number) => {
+    page = selectedPage;
+    await generatePreviewData(page);
   };
 
   const onModalClose = () => {
@@ -326,7 +420,7 @@
 
   onMount(async () => {
     if (csvEnabled) {
-      const parseResult = csvParse(csvData);
+      const parseResult = parseCsvData(csvData, csvDelimiter, csvHasHeader ?? true, csvOneItemPerCell ?? false);
       const spread: DSVRowArray<string> = Object.assign([], { columns: parseResult.columns });
 
       for (let row of parseResult) {
@@ -365,6 +459,7 @@
     loadProps();
 
     await generatePreviewData(page);
+    await refreshBatchPreviews();
 
     if (printNow && !$disconnected && printState === "idle") {
       onPrint();
@@ -388,6 +483,51 @@
       </button>
     {/if}
   </div>
+
+  {#if pagesTotal > 1}
+    <div class="batch-preview mt-3">
+      <div class="d-flex flex-wrap justify-content-center gap-2 mb-2">
+        <div class="btn-group btn-group-sm" role="group" aria-label="Batch preview layout">
+          <button
+            type="button"
+            class="btn btn-{batchPreviewMode === 'grid' ? 'secondary' : 'outline-secondary'}"
+            onclick={() => (batchPreviewMode = "grid")}>
+            <MdIcon icon="grid_view" />
+          </button>
+          <button
+            type="button"
+            class="btn btn-{batchPreviewMode === 'row' ? 'secondary' : 'outline-secondary'}"
+            onclick={() => (batchPreviewMode = "row")}>
+            <MdIcon icon="view_column" />
+          </button>
+          <button
+            type="button"
+            class="btn btn-{batchPreviewMode === 'column' ? 'secondary' : 'outline-secondary'}"
+            onclick={() => (batchPreviewMode = "column")}>
+            <MdIcon icon="view_stream" />
+          </button>
+        </div>
+        <span class="small text-body-secondary align-self-center">Batch preview: {pagesTotal} labels</span>
+      </div>
+
+      {#if batchPreviewLoading}
+        <div class="text-center text-body-secondary">Rendering batch preview...</div>
+      {:else}
+        <div class="batch-preview-list {batchPreviewMode}">
+          {#each batchPreviewUrls as url, idx (idx)}
+            <button
+              type="button"
+              class="batch-preview-item {idx === page ? 'active' : ''}"
+              title="Preview label {idx + 1}"
+              onclick={() => showBatchPage(idx)}>
+              <img src={url} alt="Label preview {idx + 1}" />
+              <span>{idx + 1}</span>
+            </button>
+          {/each}
+        </div>
+      {/if}
+    </div>
+  {/if}
 
   <div class="text-center">
     {#if pagesTotal > 1}<div>Page {page + 1} / {pagesTotal}</div>{/if}
@@ -586,7 +726,7 @@
       {#if $disconnected}
         {$tr("preview.not_connected")}
       {:else}
-        <MdIcon icon="print" /> {$tr("preview.print")}
+        <MdIcon icon="print" /> {pagesTotal > 1 ? `Batch print (${pagesTotal})` : $tr("preview.print")}
       {/if}
     </button>
   {/snippet}
@@ -612,5 +752,64 @@
     width: 1%;
     height: unset;
     padding: 0 1rem;
+  }
+  .batch-preview {
+    max-height: 45vh;
+    overflow: auto;
+  }
+  .batch-preview-list {
+    display: grid;
+    gap: 0.5rem;
+    justify-content: stretch;
+  }
+  .batch-preview-list.grid {
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 12rem), 1fr));
+  }
+  .batch-preview-list.row {
+    display: flex;
+    flex-direction: row;
+    justify-content: flex-start;
+    overflow-x: auto;
+  }
+  .batch-preview-list.column {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+  .batch-preview-list.row .batch-preview-item {
+    flex: 0 0 12rem;
+  }
+  .batch-preview-list.column .batch-preview-item {
+    width: min(100%, 18rem);
+  }
+  .batch-preview-item {
+    border: 1px solid var(--border-standard);
+    background: var(--surface-1);
+    color: inherit;
+    display: grid;
+    gap: 0.25rem;
+    grid-template-rows: minmax(0, auto) auto;
+    min-width: 0;
+    overflow: hidden;
+    padding: 0.35rem;
+    place-items: center;
+    width: 100%;
+  }
+  .batch-preview-item.active {
+    border-color: var(--bs-primary);
+    box-shadow: 0 0 0 0.15rem rgba(var(--bs-primary-rgb), 0.2);
+  }
+  .batch-preview-item img {
+    display: block;
+    image-rendering: pixelated;
+    height: auto;
+    max-height: 7rem;
+    max-width: 100%;
+    object-fit: contain;
+    width: 100%;
+  }
+  .batch-preview-item span {
+    font-size: 0.75rem;
+    line-height: 1;
   }
 </style>

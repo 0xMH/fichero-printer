@@ -19,6 +19,7 @@
   import { LocalStoragePersistence } from "$/utils/persistence";
   import { Toasts } from "$/utils/toasts";
   import { UndoRedo, type UndoState } from "$/utils/undo_redo";
+  import { TextboxExt } from "$/fabric-object/textbox-ext";
   import BarcodeParamsPanel from "$/components/designer-controls/BarcodeParamsControls.svelte";
   import CsvControl from "$/components/designer-controls/CsvControl.svelte";
   import GenericObjectParamsControls from "$/components/designer-controls/GenericObjectParamsControls.svelte";
@@ -36,6 +37,9 @@
   import { CustomCanvas } from "$/fabric-object/custom_canvas";
   import VectorParamsControls from "$/components/designer-controls/VectorParamsControls.svelte";
   import { CanvasUtils } from "$/utils/canvas_utils";
+  import { makeCsvColumnAliases } from "$/utils/csv";
+
+  const CSV_MAX_STICKER_ROWS = 5;
 
   let htmlCanvas: HTMLCanvasElement;
 
@@ -220,13 +224,150 @@
     return fabricCanvas!.toJSON();
   };
 
-  const onCsvPlaceholderPicked = (name: string) => {
-    const obj = LabelDesignerObjectHelper.addText(fabricCanvas!, `{${name}}`, {
-      textAlign: "left",
+  const csvTextOptions = () => ({
+      width: Math.max(2, labelProps.size.width - 12),
+      fontAutoSize: true,
+      fontSize: Math.max(12, Math.floor(labelProps.size.height * 0.42)),
+      textAlign: "center",
       originX: "left",
-      originY: "top",
+      originY: "center",
+      left: 6,
+      top: labelProps.size.height / 2,
+    }) as const;
+
+  const applyCsvTextTemplate = (text: string, target?: TextboxExt): TextboxExt => {
+    const obj = target ?? LabelDesignerObjectHelper.addText(fabricCanvas!, text, csvTextOptions());
+    obj.set({
+      ...csvTextOptions(),
+      text,
     });
     fabricCanvas!.setActiveObject(obj);
+    selectedObject = obj;
+    selectedCount = 1;
+    editRevision++;
+    obj.setCoords();
+    fabricCanvas!.requestRenderAll();
+    return obj;
+  };
+
+  const defaultTextValues = () => new Set(["", "Text", $tr("editor.default_text")]);
+
+  const isDefaultText = (text?: string): boolean => defaultTextValues().has((text ?? "").trim());
+
+  const csvTemplateLines = (text?: string): string[] => {
+    const defaultValues = defaultTextValues();
+    return (text ?? "")
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter((line) => line !== "" && !defaultValues.has(line));
+  };
+
+  const csvTargetTextbox = (): TextboxExt | undefined => {
+    const active = fabricCanvas?.getActiveObject();
+    if (active instanceof TextboxExt) {
+      return active;
+    }
+
+    if (selectedObject instanceof TextboxExt) {
+      return selectedObject;
+    }
+
+    const textboxes = fabricCanvas?.getObjects().filter((obj): obj is TextboxExt => obj instanceof TextboxExt) ?? [];
+    return textboxes.find((obj) => isDefaultText(obj.text)) ?? (textboxes.length === 1 ? textboxes[0] : undefined);
+  };
+
+  const activeCsvPlaceholders = (_revision: number) => {
+    const target = csvTargetTextbox();
+    if (target === undefined) {
+      return [];
+    }
+
+    return csvTemplateLines(target.text)
+      .map((line) => line.match(/^\{\s*(\w+)\s*\}$/)?.[1])
+      .filter((placeholder): placeholder is string => placeholder !== undefined);
+  };
+
+  const onCsvPlaceholderPicked = (name: string) => {
+    const placeholder = `{${name}}`;
+    const active = csvTargetTextbox();
+
+    if (active !== undefined) {
+      const lines = csvTemplateLines(active.text);
+      if (!lines.includes(placeholder) && lines.length >= CSV_MAX_STICKER_ROWS) {
+        Toasts.message(`Remove another CSV column first. Stickers can show up to ${CSV_MAX_STICKER_ROWS} rows.`);
+        return;
+      }
+
+      const nextLines = lines.includes(placeholder)
+        ? lines.filter((line) => line !== placeholder)
+        : [...lines, placeholder];
+      if (nextLines.length > 0) {
+        applyCsvTextTemplate(nextLines.join("\n"), active);
+      } else {
+        active.set({ text: "" });
+        fabricCanvas!.setActiveObject(active);
+        selectedObject = active;
+        selectedCount = 1;
+        editRevision++;
+        active.setCoords();
+        fabricCanvas!.requestRenderAll();
+      }
+    } else {
+      applyCsvTextTemplate(placeholder);
+    }
+
+    undo.push(fabricCanvas!, labelProps);
+  };
+
+  const onCsvDataLoaded = (placeholders: string[], hasHeader: boolean, replaceCurrentTemplate: boolean = false) => {
+    if (placeholders.length === 0) {
+      return;
+    }
+
+    const target = csvTargetTextbox();
+    const nextTemplate = placeholders
+      .slice(0, CSV_MAX_STICKER_ROWS)
+      .map((placeholder) => `{${placeholder}}`)
+      .join("\n");
+
+    if (replaceCurrentTemplate) {
+      if (target !== undefined && target.text === nextTemplate) {
+        return;
+      }
+
+      applyCsvTextTemplate(nextTemplate, target);
+      undo.push(fabricCanvas!, labelProps);
+      return;
+    }
+
+    if (target !== undefined) {
+      const validPlaceholders = new Set(placeholders);
+      const lines = csvTemplateLines(target.text);
+      const nextLines = lines.filter((line) => {
+        const placeholderName = line.match(/^\{\s*(\w+)\s*\}$/)?.[1];
+        return placeholderName === undefined || validPlaceholders.has(placeholderName);
+      });
+
+      if (nextLines.length !== lines.length) {
+        applyCsvTextTemplate(nextLines.join("\n"), target);
+        undo.push(fabricCanvas!, labelProps);
+        return;
+      }
+    }
+
+    if (hasHeader) {
+      return;
+    }
+
+    const objects = fabricCanvas!.getObjects();
+    const defaultText = objects.length === 1 && objects[0] instanceof TextboxExt ? objects[0] : undefined;
+    if (defaultText === undefined || !isDefaultText(defaultText.text)) {
+      return;
+    }
+
+    const rows = makeCsvColumnAliases(CSV_MAX_STICKER_ROWS).filter((placeholder) => placeholders.includes(placeholder));
+
+    applyCsvTextTemplate(rows.map((placeholder) => `{${placeholder}}`).join("\n"), defaultText);
     undo.push(fabricCanvas!, labelProps);
   };
 
@@ -475,7 +616,12 @@
           <MdIcon icon="redo" />
         </button>
 
-        <CsvControl bind:enabled={csvEnabled} onPlaceholderPicked={onCsvPlaceholderPicked} />
+        <CsvControl
+          bind:enabled={csvEnabled}
+          onPlaceholderPicked={onCsvPlaceholderPicked}
+          onDataLoaded={onCsvDataLoaded}
+          activePlaceholders={activeCsvPlaceholders(editRevision)}
+          maxActivePlaceholders={CSV_MAX_STICKER_ROWS} />
 
         <IconPicker onSubmit={onIconPicked} onSubmitSvg={onSvgIconPicked} />
         <ObjectPicker onSubmit={onObjectPicked} {labelProps} {zplImageReady} />
@@ -542,7 +688,10 @@
       {labelProps}
       {printNow}
       {csvEnabled}
-      csvData={$csvData.data} />
+      csvData={$csvData.data}
+      csvDelimiter={$csvData.delimiter}
+      csvHasHeader={$csvData.hasHeader}
+      csvOneItemPerCell={$csvData.oneItemPerCell} />
   {/if}
 </div>
 
