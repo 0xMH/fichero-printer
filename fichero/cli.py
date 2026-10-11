@@ -18,7 +18,10 @@ from fichero.printer import (
     PrinterClient,
     PrinterError,
     PrinterNotReady,
+    _bluez_connect_le,
+    bluez_disconnect,
     connect,
+    find_printer,
 )
 
 DOTS_PER_MM = 8  # 203 DPI
@@ -127,6 +130,21 @@ async def cmd_image(args: argparse.Namespace) -> None:
         print("Done." if ok else "FAILED.")
 
 
+async def cmd_connect(args: argparse.Namespace) -> None:
+    if sys.platform != "linux":
+        print("  ERROR: connect is only needed on Linux (BlueZ)")
+        sys.exit(1)
+    addr = args.address or await find_printer()
+    await _bluez_connect_le(addr)
+    print(f"  Connected to {addr} over LE. The link stays up for the web GUI;")
+    print("  close it with: fichero disconnect")
+
+
+async def cmd_disconnect(args: argparse.Namespace) -> None:
+    addr = await bluez_disconnect(args.address)
+    print(f"  Disconnected {addr}")
+
+
 async def cmd_set(args: argparse.Namespace) -> None:
     async with connect(args.address, classic=args.classic, channel=args.channel) as pc:
         if args.setting == "density":
@@ -227,6 +245,13 @@ def main() -> None:
                          help="Max image height in pixels (default: 240, prefer --label-length)")
     _add_paper_arg(p_image)
     p_image.set_defaults(func=cmd_image)
+
+    p_connect = sub.add_parser(
+        "connect", help="Open an LE-only link and leave it up (Linux, for the web GUI)")
+    p_connect.set_defaults(func=cmd_connect)
+
+    p_disconnect = sub.add_parser("disconnect", help="Close the link opened by connect")
+    p_disconnect.set_defaults(func=cmd_disconnect)
 
     p_set = sub.add_parser("set", help="Change printer settings")
     p_set.add_argument("setting", choices=["density", "shutdown", "paper"],
