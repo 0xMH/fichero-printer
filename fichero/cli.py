@@ -83,8 +83,19 @@ async def do_print(
     return True
 
 
+async def cmd_discover(args: argparse.Namespace) -> None:
+    from fichero.usb import discover_usb
+
+    devices = await discover_usb()
+    if not devices:
+        print("No D11s USB printers found.")
+    for device in devices:
+        print(f"  serial={device['serial']} bus={device['bus']} address={device['address']}")
+
+
 async def cmd_info(args: argparse.Namespace) -> None:
-    async with connect(args.address, classic=args.classic, channel=args.channel) as pc:
+    async with connect(args.address, classic=args.classic, channel=args.channel,
+                       usb=args.usb, serial=args.serial) as pc:
         info = await pc.get_info()
         for k, v in info.items():
             print(f"  {k}: {v}")
@@ -96,7 +107,8 @@ async def cmd_info(args: argparse.Namespace) -> None:
 
 
 async def cmd_status(args: argparse.Namespace) -> None:
-    async with connect(args.address, classic=args.classic, channel=args.channel) as pc:
+    async with connect(args.address, classic=args.classic, channel=args.channel,
+                       usb=args.usb, serial=args.serial) as pc:
         status = await pc.get_status()
         print(f"  Status: {status}")
         print(f"  Raw: 0x{status.raw:02X} ({status.raw:08b})")
@@ -109,7 +121,8 @@ async def cmd_text(args: argparse.Namespace) -> None:
     text = " ".join(args.text)
     label_h = _resolve_label_height(args)
     img = text_to_image(text, font_size=args.font_size, label_height=label_h)
-    async with connect(args.address, classic=args.classic, channel=args.channel) as pc:
+    async with connect(args.address, classic=args.classic, channel=args.channel,
+                       usb=args.usb, serial=args.serial) as pc:
         print(f'Printing "{text}"...')
         ok = await do_print(pc, img, args.density, paper=args.paper,
                             copies=args.copies, dither=False, max_rows=label_h)
@@ -119,7 +132,8 @@ async def cmd_text(args: argparse.Namespace) -> None:
 async def cmd_image(args: argparse.Namespace) -> None:
     img = Image.open(args.path)
     label_h = _resolve_label_height(args)
-    async with connect(args.address, classic=args.classic, channel=args.channel) as pc:
+    async with connect(args.address, classic=args.classic, channel=args.channel,
+                       usb=args.usb, serial=args.serial) as pc:
         print(f"Printing {args.path}...")
         ok = await do_print(pc, img, args.density, paper=args.paper,
                             copies=args.copies, dither=not args.no_dither,
@@ -128,7 +142,8 @@ async def cmd_image(args: argparse.Namespace) -> None:
 
 
 async def cmd_set(args: argparse.Namespace) -> None:
-    async with connect(args.address, classic=args.classic, channel=args.channel) as pc:
+    async with connect(args.address, classic=args.classic, channel=args.channel,
+                       usb=args.usb, serial=args.serial) as pc:
         if args.setting == "density":
             val = int(args.value)
             if not 0 <= val <= 2:
@@ -185,15 +200,20 @@ def _parse_paper(value: str) -> int:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Fichero D11s Label Printer")
-    parser.add_argument("--address", default=os.environ.get("FICHERO_ADDR"),
+    parser.add_argument("--address",
                         help="BLE address (skip scanning, or set FICHERO_ADDR)")
-    parser.add_argument("--classic", action="store_true",
-                        default=os.environ.get("FICHERO_TRANSPORT", "").lower() == "classic",
+    transport = parser.add_mutually_exclusive_group()
+    transport.add_argument("--usb", action="store_true", help="Use USB (requires the usb extra)")
+    parser.add_argument("--serial", help="Select USB printer by serial number")
+    transport.add_argument("--classic", action="store_true",
                         help="Use Classic Bluetooth (RFCOMM) instead of BLE (Linux only, "
                              "or set FICHERO_TRANSPORT=classic)")
     parser.add_argument("--channel", type=int, default=1,
                         help="RFCOMM channel (default: 1, only used with --classic)")
     sub = parser.add_subparsers(dest="command", required=True)
+
+    p_discover = sub.add_parser("discover", help="List USB printers")
+    p_discover.set_defaults(func=cmd_discover)
 
     p_info = sub.add_parser("info", help="Show device info")
     p_info.set_defaults(func=cmd_info)
@@ -236,9 +256,27 @@ def main() -> None:
 
     args = parser.parse_args()
 
+    if args.command == "discover":
+        if args.address or args.classic:
+            parser.error("discover lists USB printers; --address/--classic do not apply")
+        args.usb = True
+    if args.usb and args.address:
+        parser.error("--usb conflicts with --address")
+    # Environment defaults apply to Bluetooth only; an explicit --usb wins.
+    if not args.usb:
+        args.address = args.address or os.environ.get("FICHERO_ADDR")
+        args.classic = (args.classic
+                        or os.environ.get("FICHERO_TRANSPORT", "").lower() == "classic")
+    if args.serial and not args.usb:
+        parser.error("--serial requires --usb")
+    if getattr(args, "copies", 1) < 1:
+        parser.error("--copies must be positive")
+
     # Resolve --paper string to int for print commands
     if hasattr(args, "paper") and isinstance(args.paper, str):
         args.paper = _parse_paper(args.paper)
+    if args.usb and getattr(args, "paper", PAPER_GAP) != PAPER_GAP:
+        parser.error("Only gap paper is verified over USB")
 
     try:
         asyncio.run(args.func(args))

@@ -1,0 +1,56 @@
+name: Python tests
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: python-tests-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Python ${{ matrix.python }} (USB extra=${{ matrix.usb }})
+    # Same-repository PRs are already tested by their push; test only fork PRs.
+    if: >-
+      github.event_name != 'pull_request' ||
+      github.event.pull_request.head.repo.full_name != github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ['3.10', '3.12', '3.14']
+        usb: [true]
+        include:
+          - python: '3.12'
+            usb: false
+    env:
+      UV_PYTHON: ${{ matrix.python }}
+      FICHERO_ADDR: ''
+      FICHERO_TRANSPORT: ''
+    steps:
+      - uses: actions/checkout@v5
+      - uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+          cache-suffix: py${{ matrix.python }}-usb-${{ matrix.usb }}
+      - name: Install test dependencies with USB
+        if: matrix.usb
+        run: uv sync --locked --group test --extra usb
+      - name: Install test dependencies without USB
+        if: ${{ !matrix.usb }}
+        run: uv sync --locked --group test
+      - name: Run all transport tests (mock devices)
+        if: matrix.usb
+        run: uv run --no-sync python -m pytest -q
+      - name: Verify Bluetooth-only installation
+        if: ${{ !matrix.usb }}
+        run: |
+          uv run --no-sync python -c "import fichero, importlib.util; assert importlib.util.find_spec('usb') is None"
+          uv run --no-sync fichero --help
+          uv run --no-sync python -m pytest -q

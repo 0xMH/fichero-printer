@@ -1,7 +1,7 @@
 [project]
 name = "fichero-printer"
 version = "0.1.0"
-description = "Fichero D11s thermal label printer - BLE CLI tool"
+description = "Fichero D11s thermal label printer - BLE, Classic Bluetooth and USB CLI tool"
 requires-python = ">=3.10"
 dependencies = [
     "bleak",
@@ -18,3 +18,9 @@ packages = ["fichero"]
 
 [project.scripts]
 fichero = "fichero.cli:main"
+
+[project.optional-dependencies]
+usb = ["pyusb>=1.2.1"]
+
+[dependency-groups]
+test = ["pytest>=8", "pytest-asyncio>=0.23"]

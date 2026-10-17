@@ -1,0 +1,2 @@
+# Local active-seat access via systemd-logind; processed before 73-seat-late.rules.
+SUBSYSTEM=="usb", ENV{DEVTYPE}=="usb_device", ATTR{idVendor}=="09c5", ATTR{idProduct}=="0200", TAG+="uaccess"

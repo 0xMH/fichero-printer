@@ -10,7 +10,7 @@ The [Fichero](https://www.action.com/nl-nl/p/3212141/fichero-labelprinter/) is a
 
 - 96px wide printhead, 203 DPI
 - Prints 1-bit raster images onto self-adhesive labels (14mm x 30mm default)
-- Connects via BLE or Classic Bluetooth SPP
+- Connects via BLE, Classic Bluetooth SPP, or USB (Python CLI)
 - 18500 Li-Ion battery (1200mAh), USB-C charging
 - Bluetooth names: `FICHERO_5836`, `D11s_`
 
@@ -75,6 +75,44 @@ You can also pass it per-command:
 uv run fichero --address AA:BB:CC:DD:EE:FF info
 ```
 
+## USB printing
+
+USB printing is hardware-verified on the AiYin D11s/FICHERO `09c5:0200`
+(firmware 2.4.9, Linux); other VID/PIDs are not supported. The Web GUI still
+uses Bluetooth. Install the optional Python dependency and a system libusb
+backend:
+
+```sh
+uv sync --extra usb
+# Debian/Ubuntu:
+sudo apt install libusb-1.0-0
+
+uv run --extra usb fichero discover
+uv run --extra usb fichero --usb info
+uv run --extra usb fichero --usb status
+uv run --extra usb fichero --usb text "Hello USB!"
+uv run --extra usb fichero --usb image label.png --copies 3
+uv run --extra usb fichero --usb --serial YOUR_USB_SERIAL image label.png
+```
+
+All commands work as over Bluetooth, including the cover/paper check before each
+copy and the stop acknowledgment. `--usb` ignores `FICHERO_ADDR` and
+`FICHERO_TRANSPORT`, and `--serial` is required when several printers are
+connected. Only gap-separated stock is verified. A timeout or partial write
+leaves the print outcome unknown; inspect the printer before retrying.
+
+On Linux with udev and systemd-logind, install the ACL rule for the active
+desktop user and reconnect the printer:
+
+```sh
+sudo install -m 644 contrib/70-fichero-usb.rules /etc/udev/rules.d/
+sudo udevadm control --reload-rules
+# Unplug/replug the printer after reloading.
+```
+
+See [docs/USB.md](docs/USB.md) for headless permissions, usblp/CUPS contention,
+macOS/Windows, library use, and the observed reply behaviour.
+
 ## CLI Usage
 
 ```
@@ -129,6 +167,25 @@ asyncio.run(main())
 ```
 
 The package exports `PrinterClient`, `connect`, `PrinterError`, `PrinterNotFound`, `PrinterTimeout`, `PrinterNotReady`, and `PrinterStatus`.
+
+## Python tests
+
+```sh
+uv sync --locked --group test --extra usb
+uv run --no-sync python -m pytest -q
+```
+
+Tests use simulated BLE notifications, RFCOMM sockets, and USB devices; no printer,
+Bluetooth adapter, libusb backend, or root access is required. GitHub Actions runs
+these tests on pushes, pull requests, and manual dispatches, including a
+Bluetooth-only installation without PyUSB.
+
+To run the same workflow locally with [act](https://nektosact.com/) and Docker:
+
+```sh
+act push -W .github/workflows/python-tests.yml \
+  -P ubuntu-latest=catthehacker/ubuntu:act-latest
+```
 
 ## TODO
 

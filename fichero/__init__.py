@@ -1,4 +1,4 @@
-"""Fichero D11s thermal label printer - BLE + Classic Bluetooth interface."""
+"""Fichero D11s thermal label printer - BLE, Classic Bluetooth and USB interface."""
 
 from fichero.printer import (
     RFCOMM_CHANNEL,
@@ -12,6 +12,8 @@ from fichero.printer import (
     connect,
 )
 
+from fichero.usb import USBClient, discover_usb
+
 __all__ = [
     "RFCOMM_CHANNEL",
     "PrinterClient",
@@ -22,4 +24,6 @@ __all__ = [
     "PrinterTimeout",
     "RFCOMMClient",
     "connect",
+    "USBClient",
+    "discover_usb",
 ]
